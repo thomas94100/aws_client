@@ -38,8 +38,6 @@ class RestXmlProtocol {
     endpointUrl ??= 'https://$service.$region.amazonaws.com';
     service ??= extractService(Uri.parse(endpointUrl));
     region ??= extractRegion(Uri.parse(endpointUrl));
-    credentials ??= AwsClientCredentials.resolve();
-    ArgumentError.checkNotNull(credentials, 'credentials');
     return RestXmlProtocol._(client, service, region, endpointUrl, credentials);
   }
 
@@ -52,10 +50,10 @@ class RestXmlProtocol {
     dynamic payload,
     String resultWrapper,
   }) async {
-    final rq = _buildRequest(method, requestUri, queryParams, payload);
+    final rq = _buildRequest(method, requestUri, queryParams, payload, headers);
     final rs = await _client.send(rq);
     final body = await rs.stream.bytesToString();
-    final root = XmlDocument.parse(body);
+    final root = parse(body);
     var elem = root.rootElement;
     if (elem.name.local == 'ErrorResponse') {
       final error = elem.findElements('Error').first;
@@ -79,6 +77,7 @@ class RestXmlProtocol {
     String requestUri,
     Map<String, String> queryParams,
     dynamic payload,
+    Map<String, String> headers
   ) {
     queryParams ??= <String, String>{};
     final rq = Request(
@@ -87,6 +86,9 @@ class RestXmlProtocol {
         '$_endpointUrl$requestUri',
       ).replace(queryParameters: queryParams.isEmpty ? null : queryParams),
     );
+    if(headers !=null){
+      rq.headers.addAll(headers);
+    }
     if (payload is XmlElement) {
       rq.body = payload.toXmlString();
       rq.headers['Content-Type'] = 'application/xml';
